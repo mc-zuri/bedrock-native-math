@@ -17,23 +17,36 @@ struct Vec3 { float x, y, z; };
 static void move_relative(Vec3* vel, float yaw_deg,
                           float strafe, float up, float forward, float speed)
 {
-    float dist_sq = strafe * strafe + up * up + forward * forward;
+    const float dist_sq = (float)((float)(strafe * strafe) + (float)(up * up))
+                        + (float)(forward * forward);
     if (dist_sq < 0.000099999997f) return;
 
-    float dist = sqrtf(dist_sq);
-    if (dist < 1.0f) dist = 1.0f;
+    const float factor = speed / fmaxf(sqrtf(dist_sq), 1.0f);
+    const float scaled_strafe  = strafe   * factor;
+    const float scaled_up      = up       * factor;
+    const float scaled_forward = forward  * factor;
 
-    float scale = speed / dist;
-    float angle = yaw_deg * DEG_TO_RAD;
-    float s     = sinf(angle);
-    float c     = cosf(angle);
+    const float rad = yaw_deg * DEG_TO_RAD;
+    const float sin_yaw = sinf(rad);
+    const float cos_yaw = cosf(rad);
 
-    float strafe_s  = strafe  * scale;
-    float forward_s = forward * scale;
+    vel->y += scaled_up;
+    vel->x += scaled_strafe  * cos_yaw - scaled_forward * sin_yaw;
+    vel->z += scaled_forward * cos_yaw + scaled_strafe  * sin_yaw;
+}
 
-    vel->y += up * scale;
-    vel->x += strafe_s  * c - forward_s * s;
-    vel->z += forward_s * c + strafe_s  * s;
+// mce::Math sin lookup table — 65536-entry table BDS indexes via
+// (int)(rad * 10430.378) or (int)(yaw_deg * 182.04443). Used by
+// JumpFromGroundSystem's sprint horizontal boost, getViewVector, etc.
+// Built with MSVC sinf so bit-exact to BDS's MSVC build.
+static float mce_sin_table[65536];
+static bool  mce_sin_table_ready = false;
+static void mce_init_sin_table() {
+    if (mce_sin_table_ready) return;
+    for (int i = 0; i < 65536; i++) {
+        mce_sin_table[i] = sinf((float)i * (2.0f * 3.14159265358979323846f / 65536.0f));
+    }
+    mce_sin_table_ready = true;
 }
 
 static inline float apply_friction(float v, float k) {
@@ -85,6 +98,14 @@ Napi::Value ApplyFriction(const Napi::CallbackInfo& info) {
     return num(info.Env(), apply_friction(f(info, 0), f(info, 1)));
 }
 
+// mce::g_mSin[idx & 0xFFFF] — BDS sin lookup table indexed by integer.
+// Used by JumpFromGroundSystem's sprint boost: idx = (int)(yaw_deg * 182.04443f).
+Napi::Value SinTable(const Napi::CallbackInfo& info) {
+    mce_init_sin_table();
+    int i = info[0].As<Napi::Number>().Int32Value() & 0xFFFF;
+    return num(info.Env(), mce_sin_table[i]);
+}
+
 Napi::Value Fround(const Napi::CallbackInfo& info) {
     return num(info.Env(), f(info, 0));
 }
@@ -103,12 +124,13 @@ Napi::Object Constants(Napi::Env env) {
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("sinf",          Napi::Function::New(env, Sinf));
-    exports.Set("cosf",          Napi::Function::New(env, Cosf));
-    exports.Set("sincosf",       Napi::Function::New(env, Sincosf));
-    exports.Set("moveRelative",  Napi::Function::New(env, MoveRelative));
-    exports.Set("applyFriction", Napi::Function::New(env, ApplyFriction));
-    exports.Set("fround",        Napi::Function::New(env, Fround));
-    exports.Set("constants",     Constants(env));
+    exports.Set("cosf",           Napi::Function::New(env, Cosf));
+    exports.Set("sincosf",        Napi::Function::New(env, Sincosf));
+    exports.Set("moveRelative",   Napi::Function::New(env, MoveRelative));
+    exports.Set("applyFriction",  Napi::Function::New(env, ApplyFriction));
+    exports.Set("sinTable",       Napi::Function::New(env, SinTable));
+    exports.Set("fround",         Napi::Function::New(env, Fround));
+    exports.Set("constants",      Constants(env));
     return exports;
 }
 
