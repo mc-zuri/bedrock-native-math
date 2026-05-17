@@ -1,0 +1,34 @@
+{
+  "name": "bedrock-native-math",
+  "version": "0.1.0",
+  "description": "Native float32 math primitives matching Minecraft Bedrock Edition",
+  "main": "index.js",
+  "scripts": {
+    "install": "node-gyp rebuild",
+    "rebuild": "node-gyp rebuild",
+    "test": "node test/basic.test.js"
+  },
+  "keywords": [
+    "minecraft",
+    "bedrock",
+    "physics",
+    "float32",
+    "fp-fast",
+    "native",
+    "addon",
+    "n-api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "gypfile": true,
+  "dependencies": {
+    "node-addon-api": "^8.0.0",
+    "node-gyp": "^10.0.0"
+  },
+  "files": [
+    "binding.gyp",
+    "src/",
+    "lib/",
+    "index.js"
+  ]
+}
