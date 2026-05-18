@@ -53,6 +53,12 @@ static inline float apply_friction(float v, float k) {
     return (fabsf(v) > BDS_EPSILON) ? v * k : 0.0f;
 }
 
+static inline void move_aabb_axis(float min_in, float max_in, float vel,
+                                  float* min_out, float* max_out) {
+    *min_out = min_in + vel;
+    *max_out = max_in + vel;
+}
+
 inline float f(const Napi::CallbackInfo& info, size_t i) {
     return static_cast<float>(info[i].As<Napi::Number>().DoubleValue());
 }
@@ -98,6 +104,19 @@ Napi::Value ApplyFriction(const Napi::CallbackInfo& info) {
     return num(info.Env(), apply_friction(f(info, 0), f(info, 1)));
 }
 
+Napi::Value MoveAABBAxis(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    float min_in = f(info, 0);
+    float max_in = f(info, 1);
+    float vel    = f(info, 2);
+    float min_out, max_out;
+    move_aabb_axis(min_in, max_in, vel, &min_out, &max_out);
+    Napi::Object r = Napi::Object::New(env);
+    r.Set("min", num(env, min_out));
+    r.Set("max", num(env, max_out));
+    return r;
+}
+
 // mce::g_mSin[idx & 0xFFFF] — BDS sin lookup table indexed by integer.
 // Used by JumpFromGroundSystem's sprint boost: idx = (int)(yaw_deg * 182.04443f).
 Napi::Value SinTable(const Napi::CallbackInfo& info) {
@@ -128,6 +147,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("sincosf",        Napi::Function::New(env, Sincosf));
     exports.Set("moveRelative",   Napi::Function::New(env, MoveRelative));
     exports.Set("applyFriction",  Napi::Function::New(env, ApplyFriction));
+    exports.Set("moveAABBAxis",   Napi::Function::New(env, MoveAABBAxis));
     exports.Set("sinTable",       Napi::Function::New(env, SinTable));
     exports.Set("fround",         Napi::Function::New(env, Fround));
     exports.Set("constants",      Constants(env));
